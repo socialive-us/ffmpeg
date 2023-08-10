@@ -198,7 +198,17 @@ static OSStatus tls_read_cb(SSLConnectionRef connection, void *data, size_t *dat
     URLContext *h = (URLContext*)connection;
     TLSContext *c = h->priv_data;
     size_t requested = *dataLength;
+
+    // Pass non-blocking stream flag to secondary protocols
+    int set_flag_nonblock = 0;
+    if (h->flags&AVIO_FLAG_NONBLOCK && !(c->tls_shared.tcp->flags&AVIO_FLAG_NONBLOCK)) {
+        c->tls_shared.tcp->flags |= AVIO_FLAG_NONBLOCK;
+        set_flag_nonblock = 1;
+    }
     int read = ffurl_read(c->tls_shared.tcp, data, requested);
+    if (set_flag_nonblock)
+        c->tls_shared.tcp->flags &= ~AVIO_FLAG_NONBLOCK;
+    
     if (read <= 0) {
         *dataLength = 0;
         switch(AVUNERROR(read)) {
