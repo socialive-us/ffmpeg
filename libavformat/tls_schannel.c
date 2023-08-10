@@ -415,8 +415,17 @@ static int tls_read(URLContext *h, uint8_t *buf, int len)
             }
         }
 
-        ret = ffurl_read(s->tcp, c->enc_buf + c->enc_buf_offset,
-                         c->enc_buf_size - c->enc_buf_offset);
+        // Pass non-blocking stream flag to secondary protocols
+        int set_flag_nonblock = 0;
+        if (h->flags&AVIO_FLAG_NONBLOCK && !(s->tcp->flags&AVIO_FLAG_NONBLOCK)) {
+            s->tcp->flags |= AVIO_FLAG_NONBLOCK;
+            set_flag_nonblock = 1;
+        }
+        ret = ffurl_read(s->tcp, c->enc_buf + c->enc_buf_offset, 
+            c->enc_buf_size - c->enc_buf_offset);
+        if (set_flag_nonblock)
+            s->tcp->flags &= ~AVIO_FLAG_NONBLOCK;
+        
         if (ret == AVERROR_EOF) {
             c->connection_closed = 1;
             ret = 0;
